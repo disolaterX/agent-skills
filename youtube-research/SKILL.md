@@ -5,7 +5,7 @@ description: Search YouTube for videos on a topic with date filtering, then extr
 
 # YouTube Research
 
-Search → review → fetch transcripts → synthesize. Two composable scripts; the agent orchestrates.
+Search → review → fetch transcripts → synthesize. Three composable scripts; the agent orchestrates. Add `frames.py` when you need to *see* the video (UI walkthroughs, demos), not just read it.
 
 ## Quick start
 
@@ -82,11 +82,42 @@ Transcripts are cached at `~/.cache/youtube-research/{video_id}/{language}.json`
 
 #### YouTube anti-bot / cookies
 
-If you hit "Sign in to confirm you're not a bot", set `YOUTUBE_COOKIES_FROM_BROWSER` to a browser name yt-dlp can read cookies from (`safari`, `chrome`, `firefox`, `edge`, etc.). The value is passed straight to yt-dlp's `cookiesfrombrowser` option for both `fetch.py` and `search.py` is unaffected (search uses no cookies).
+If you hit "Sign in to confirm you're not a bot", set `YOUTUBE_COOKIES_FROM_BROWSER` to a browser name yt-dlp can read cookies from (`safari`, `chrome`, `firefox`, `edge`, etc.). The value is passed straight to yt-dlp's `cookiesfrombrowser` option for both `fetch.py` and `frames.py` (`search.py` is unaffected — it uses no cookies). Video downloads in `frames.py` trip the bot check more often than transcript fetches, so reach for this first if frame extraction fails to download.
 
 ```bash
 YOUTUBE_COOKIES_FROM_BROWSER=safari ./fetch.py VIDEO_ID
 ```
+
+### `scripts/frames.py <video> [<video>...] [options]`
+
+Extracts still frames (screenshots) so the agent can **see** what's on screen — built for UI walkthroughs, product demos, "how this website's flow works" videos you want to understand or reconstruct. Downloads the video (or a slice), runs ffmpeg, then **deletes the video** and keeps only PNGs + a `manifest.json` that pairs each frame with the nearest spoken transcript line.
+
+Requires `ffmpeg` + `ffprobe` on PATH (yt-dlp comes via uv).
+
+```bash
+# Capture the distinct UI states of a walkthrough, then read them
+{baseDir}/scripts/frames.py VIDEO_ID --mode scene --section 1:30-5:00
+# → frames + manifest.json under ~/.cache/youtube-research/{id}/frames/
+# Then: read manifest.json for frame→timestamp→transcript, and Read the PNGs (multimodal).
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--mode scene\|interval\|timestamp` | `scene` | `scene` = grab each distinct screen (best for UI flows); `interval` = every N sec; `timestamp` = explicit/keyword |
+| `--scene-threshold FLOAT` | 0.3 | Scene sensitivity 0–1; lower = more frames |
+| `--min-gap SEC` | 1.0 | scene mode: merge frames closer than this (collapses zoom/transition bursts; 0 = off) |
+| `--interval SEC` | 5 | Seconds between frames in interval mode |
+| `--at "M:SS,M:SS"` | — | timestamp mode: explicit times |
+| `--keyword TEXT` | — | timestamp mode: grab a frame whenever the transcript says TEXT |
+| `--section M:SS-M:SS` | whole video | Only download/extract this range (much faster, smaller) |
+| `--resolution N` | 1080 | Max video height — keep ≥720 so on-screen text stays readable |
+| `--max-frames N` | 60 | Cap total frames (evenly thinned, keeps first/last) |
+| `--keep-video` | off | Keep the downloaded mp4 alongside the frames |
+| `--refresh` | off | Wipe and re-extract this video's frames dir |
+
+Output (stdout, one JSON line per video): `{id, title, mode, frame_count, frames_dir, manifest, transcript_source}`. Frames are named `frame_NNNN_t<seconds>.png`; `manifest.json` lists `{index, file, path, timestamp, timestamp_hms, transcript}` per frame.
+
+**Workflow for "understand/clone this UI":** scene-extract a `--section` of the relevant part → read `manifest.json` → `Read` the frames in order, using the paired transcript as narration. For a rebuild, prefer understanding the flow and recreating it rather than copying exact trade-dress 1:1.
 
 ## Tips
 
@@ -97,3 +128,4 @@ YOUTUBE_COOKIES_FROM_BROWSER=safari ./fetch.py VIDEO_ID
 - The transcript API may fail on region-locked or transcript-disabled videos. The script logs the error per video and continues — check `transcript_source: "none"` or an `error` field on the result.
 - **First run downloads deps via uv** (~10-15s). Subsequent runs reuse the cached env and are fast.
 - **Iterating on a corpus is cheap.** Once a video's transcript is in the cache, re-running `fetch.py` on the same list is near-instant (no network, no sleep). Use this to refine searches without paying the transcript cost twice.
+- **`frames.py` is download-bound, not extraction-bound.** The slow part is pulling the video; ffmpeg is fast. Always pass `--section M:SS-M:SS` to grab just the relevant stretch — a 2-min slice downloads in ~1 min, the whole video can be many minutes. Keep `--resolution >= 720` so button labels and form text stay legible.
