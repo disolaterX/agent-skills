@@ -6,6 +6,7 @@ A collection of [Claude Code](https://code.claude.com/docs/en/skills) / agent sk
 
 | Skill | What it does |
 |---|---|
+| [`make-it-more-me`](./make-it-more-me) | Learns *your* writing voice from your own Claude Code transcripts and prose, builds a personal voice profile, then edits text to sound like you instead of like a language model. Two phases (calibrate once, then apply). Ships no personal data. |
 | [`youtube-research`](./youtube-research) | Search YouTube with date / view / keyword filters, fetch transcripts + metadata with a persistent cache, and synthesize across many videos (itineraries, market research, comparison reports). No API key required. |
 
 ## Install
@@ -13,6 +14,7 @@ A collection of [Claude Code](https://code.claude.com/docs/en/skills) / agent sk
 ### Via [skills.sh](https://skills.sh) CLI (recommended)
 
 ```bash
+npx skills add disolaterX/agent-skills --skill make-it-more-me
 npx skills add disolaterX/agent-skills --skill youtube-research
 ```
 
@@ -33,6 +35,10 @@ Each top-level directory is one self-contained skill:
 
 ```
 agent-skills/
+├── make-it-more-me/
+│   ├── SKILL.md          # router: setup vs apply, verification
+│   ├── references/       # calibration, AI-tells ruleset, profile template
+│   └── scripts/          # transcript miner + front-matter quoter
 ├── youtube-research/
 │   ├── SKILL.md          # frontmatter + workflow doc
 │   └── scripts/          # uv-script Python helpers
