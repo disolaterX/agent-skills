@@ -9,6 +9,7 @@ A collection of [Claude Code](https://code.claude.com/docs/en/skills) / agent sk
 | [`make-it-more-me`](./make-it-more-me) | Learns *your* writing voice from your own Claude Code transcripts and prose, builds a personal voice profile, then edits text to sound like you instead of like a language model. Two phases (calibrate once, then apply). Ships no personal data. |
 | [`youtube-research`](./youtube-research) | Search YouTube with date / view / keyword filters, fetch transcripts + metadata with a persistent cache, and synthesize across many videos (itineraries, market research, comparison reports). No API key required. |
 | [`file-pr`](./file-pr) | Files a concise pull request: checks for an existing PR on the branch, verifies the diff against origin/main, follows repo title conventions, and writes a description that leads with the problem, not an implementation inventory. |
+| [`unslop`](./unslop) | Cuts AI tells from any writing and adds human voice. Must always apply. |
 
 ## Install
 
@@ -18,6 +19,7 @@ A collection of [Claude Code](https://code.claude.com/docs/en/skills) / agent sk
 npx skills add disolaterX/agent-skills --skill make-it-more-me
 npx skills add disolaterX/agent-skills --skill youtube-research
 npx skills add disolaterX/agent-skills --skill file-pr
+npx skills add disolaterX/agent-skills --skill unslop
 ```
 
 ### Manual
@@ -46,6 +48,8 @@ agent-skills/
 │   └── scripts/          # uv-script Python helpers
 ├── file-pr/
 │   └── SKILL.md          # PR title/description conventions
+├── unslop/
+│   └── SKILL.md          # cut AI tells, add human voice
 └── README.md             # this file
 ```
 
