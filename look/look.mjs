@@ -394,11 +394,12 @@ const clickTarget = async (raw) => {
   return result;
 };
 
-const scrollOnce = () =>
-  page.evaluate(() => {
-    const scroller = document.scrollingElement || document.documentElement;
-    let best = null;
-    let bestGain = 0;
+const sampleScroller = (doScroll) =>
+  page.evaluate((scrollNow) => {
+    const clean = (value) => (value || "").replace(/\s+/g, " ").trim();
+    const doc = document.scrollingElement || document.documentElement;
+    const candidates = [];
+    if (doc && doc.scrollHeight > doc.clientHeight + 24) candidates.push(doc);
     for (const el of document.querySelectorAll("div,main,section,ul,ol,[role=main],[role=feed],[role=list]")) {
       const style = getComputedStyle(el);
       if (!/auto|scroll|overlay/.test(style.overflowY)) continue;
@@ -406,45 +407,93 @@ const scrollOnce = () =>
       if (gain <= 24) continue;
       const rect = el.getBoundingClientRect();
       if (rect.width < 120 || rect.height < 120) continue;
-      if (gain > bestGain) {
-        bestGain = gain;
-        best = el;
-      }
+      candidates.push(el);
     }
-    if (scroller) {
-      const gain = scroller.scrollHeight - scroller.clientHeight;
-      const rect = scroller.getBoundingClientRect ? scroller.getBoundingClientRect() : { width: innerWidth, height: innerHeight };
-      if (gain > 24 && rect.width * rect.height >= 120 * 120 && gain > bestGain) {
-        bestGain = gain;
-        best = scroller;
-      }
+    candidates.sort((a, b) => b.scrollHeight - b.clientHeight - (a.scrollHeight - a.clientHeight));
+    const el = candidates[0] || doc;
+    if (!el) return { isDocument: true, height: 0, scrollTop: 0, atEnd: true, hash: 0, len: 0, rect: null };
+    const isDocument = el === doc;
+    if (scrollNow) el.scrollTop = el.scrollHeight;
+    const text = clean(el.innerText || "");
+    let hash = 0x811c9dc5;
+    const bounded = text.length > 60000 ? text.slice(0, 60000) : text;
+    for (let i = 0; i < bounded.length; i += 1) {
+      hash ^= bounded.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
     }
-    const docHeight = document.documentElement ? document.documentElement.scrollHeight : 0;
-    if (!best) return { moved: 0, gain: 0, height: docHeight, atEnd: true, tag: null };
-    const before = best.scrollTop;
-    const beforeHeight = best.scrollHeight;
-    best.scrollTop = best.scrollHeight;
+    const rect = el.getBoundingClientRect();
     return {
-      moved: Math.round(best.scrollTop - before),
-      gain: bestGain,
-      height: beforeHeight,
-      atEnd: best.scrollTop + best.clientHeight >= best.scrollHeight - 4,
-      tag: best.tagName?.toLowerCase() ?? "document",
+      isDocument,
+      height: el.scrollHeight,
+      scrollTop: Math.round(el.scrollTop),
+      atEnd: el.scrollTop + el.clientHeight >= el.scrollHeight - 4,
+      hash,
+      len: text.length,
+      rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height) },
     };
-  });
+  }, doScroll);
 
 const doScroll = async (times) => {
-  const log = { requested: times, done: 0, heightBefore: null, heightAfter: null, grew: false, atEnd: false, stalled: false, target: null };
-  for (let i = 0; i < times; i += 1) {
-    const r = await scrollOnce();
-    if (log.heightBefore === null) log.heightBefore = r.height;
-    if (r.tag) log.target = r.tag;
-    log.done += 1;
-    log.heightAfter = r.height;
-    log.atEnd = r.atEnd;
+  const first = await sampleScroller(false);
+  const log = {
+    requested: times,
+    done: 0,
+    strategy: first.isDocument ? "programmatic" : "wheel",
+    target: first.isDocument ? "document" : "container",
+    heightBefore: first.height,
+    heightAfter: first.height,
+    scrollTop: first.scrollTop,
+    grew: false,
+    atEnd: first.atEnd,
+    contentChanged: false,
+    wheelTicks: 0,
+    stalled: false,
+  };
+  if (!first.rect) {
+    log.stalled = true;
+    return log;
+  }
+  let prev = first;
+  const hover = async () => page.mouse.move(first.rect.x + Math.round(first.rect.w / 2), first.rect.y + Math.round(first.rect.h / 2));
+  if (log.strategy === "wheel") await hover();
+
+  const step = async (mode) => {
+    if (mode === "wheel") {
+      await hover();
+      await page.mouse.wheel(0, Math.max(600, Math.round(first.rect.h * 1.4)));
+      log.wheelTicks += 1;
+    } else {
+      await sampleScroller(true);
+    }
     await page.waitForTimeout(opts.settle);
-    if (log.done > 1 && r.height > log.heightBefore) log.grew = true;
-    if (r.moved < 8) {
+    return sampleScroller(false);
+  };
+
+  for (let i = 0; i < times; i += 1) {
+    let now = await step(log.strategy);
+    const progressed = now.hash !== prev.hash || now.scrollTop !== prev.scrollTop || now.height !== prev.height;
+    log.done += 1;
+    log.heightAfter = now.height;
+    log.scrollTop = now.scrollTop;
+    log.atEnd = now.atEnd;
+    if (now.height > log.heightBefore) log.grew = true;
+    if (now.hash !== prev.hash) log.contentChanged = true;
+
+    if (!progressed && log.strategy === "wheel") {
+      log.strategy = "wheel+programmatic";
+      now = await step("programmatic");
+      log.done += 1;
+      if (now.hash !== prev.hash || now.scrollTop !== prev.scrollTop) {
+        log.contentChanged = log.contentChanged || now.hash !== prev.hash;
+        log.scrollTop = now.scrollTop;
+        log.atEnd = now.atEnd;
+        prev = now;
+        continue;
+      }
+    }
+
+    prev = now;
+    if (!progressed) {
       log.stalled = true;
       break;
     }
@@ -567,7 +616,7 @@ try {
         scrollTo.ok = true;
         break;
       }
-      await scrollOnce();
+      await sampleScroller(true);
       scrollTo.scrolls += 1;
       await page.waitForTimeout(opts.settle);
     }

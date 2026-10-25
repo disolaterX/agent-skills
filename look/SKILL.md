@@ -104,7 +104,7 @@ Usage errors cover: no url, more than one url, unknown flag, empty `--click`/`--
 
 `--click` reports `ok` only when a real button, link, tab, role element or input was clicked — plain text nodes are not clickable and are reported as failures. Each click also reports `changed`: `false` means the click landed but the page did not change, so it did nothing useful.
 
-`--scroll` reports `{requested, done, heightBefore, heightAfter, grew, atEnd, stalled, target}`. `stalled: true` means a scroll added nothing new; with `atEnd: true` the container was already at its end, so what you see is the ceiling. Do not keep retrying — if a list needs more than that, it is behind a sign-in or a wall.
+`--scroll` reports `{requested, done, strategy, target, heightBefore, heightAfter, scrollTop, grew, atEnd, contentChanged, wheelTicks, stalled}`. The document is scrolled programmatically; a nested panel (maps review lists, virtualised feeds) is driven with mouse-wheel events over its centre, because `scrollTop` on a guessed container does not move those. `strategy` says which ran (`programmatic`, `wheel`, or `wheel+programmatic` when the wheel moved nothing and a programmatic nudge was tried). On a virtualised list the height never grows because nodes are replaced, so `contentChanged` is the signal that matters: content changing without height growing is progress, not a stall. `stalled: true` means a scroll changed neither position nor content — what you see is the ceiling; do not keep retrying.
 
 `thin-content` only applies to HTML responses. A JSON or plain-text endpoint that answers `{"ok":true}` is content, not an empty shell, and passes.
 
