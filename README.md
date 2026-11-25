@@ -4,7 +4,7 @@ The [Claude Code](https://code.claude.com/docs/en/skills) / agent skills I use d
 
 ## Skills
 
-Copied from [t3dotgg/tstack](https://github.com/t3dotgg/tstack) (MIT). `file-pr` and `leaving-pr-comments` are edited to drop all model/harness attribution; the rest match upstream.
+Copied from [t3dotgg/tstack](https://github.com/t3dotgg/tstack) (MIT). `file-pr` and `leaving-pr-comments` are edited to drop all model/harness attribution, and `council` seats Gemini Neon through Cursor instead of Gemini Pro; the rest match upstream.
 
 | Skill | What it does |
 |---|---|
@@ -40,7 +40,7 @@ cd agent-skills
 
 ## Updating from tstack
 
-Pull upstream changes into each skill by hand and keep the two attribution edits.
+Pull upstream changes into each skill by hand and keep the local edits above.
 
 ## License
 
