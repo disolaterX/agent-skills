@@ -13,14 +13,13 @@ and explore new ideas, skip fixes to code being replaced.
 Bring in three delegates to help with the user's request, usually for review
 or feedback. Use one strong model from each of three different providers, at
 high reasoning effort. If the user's instructions name council members, use
-those. Otherwise pick the latest flagship model from each provider: Claude
-Opus, GPT Sol, and Gemini Neon. Run Gemini Neon through Cursor, the `cursor`
-provider in T3 Code.
+those. Otherwise use the latest Claude Opus, GPT Sol, and Gemini Neon.
 
-In T3 Code, use `orchestrator_capabilities` to resolve the models, then
-`delegate_task` to start one delegate per model in parallel. Elsewhere, use
-the harness's subagent tools. If you cannot reach three providers, or a named
-member is unavailable, report it instead of substituting.
+In T3 Code, use `orchestrator_capabilities` to resolve the models (run Gemini
+Neon on the `cursor` provider instance), then `delegate_task` to start one
+delegate per model in parallel. Elsewhere, use the harness's subagent tools.
+If you cannot reach three providers, or a requested or default member is
+unavailable, report it instead of substituting.
 
 Give each delegate the request and relevant context. For review or feedback,
 keep their work read-only. Collect their responses and summarize the useful
